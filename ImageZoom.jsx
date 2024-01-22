@@ -1,10 +1,12 @@
 import React, { useEffect, useReducer, useRef, useState } from 'react';
 import { TransformWrapper, TransformComponent } from "react-zoom-pan-pinch";
 
-const ImageZoom = ({ image, setCrop }) => {
+const ImageZoom = ({ image, setCroppedImageUrl }) => {
+// const ImageZoom = ({ image, setCrop }) => {
     const imgRef = useRef();
     const [img, setImg] = useState();
-    const [croppedImageUrl, setCroppedImageUrl] = useState(null);
+    const [crop, setCrop] = useState();
+    // const [croppedImageUrl, setCroppedImageUrl] = useState(null);
     const cropData = useRef();
 
     useEffect(() => {
@@ -34,20 +36,84 @@ const ImageZoom = ({ image, setCrop }) => {
                 scale 
             };
 
-            cropData.current = crop;
-            onCropImage();
+            // cropData.current = crop;
+            setCrop({ 
+                x: Math.abs(crop.x),
+                y: Math.abs(crop.y),
+                width: crop.width,
+                height: crop.height,
+                unit:'px' 
+            });
+            // onCropImage();
         }
     }
 
     const onCropImage = async () => {
-        //TODO: x, y가 이미지 전체보다 넘어가면 크롭 영역 잘려서 들어가기 처리 추가
-
         setCrop({ 
-            x: Math.abs(cropData.current.x), 
-            y: Math.abs(cropData.current.y), 
-            width: cropData.current.width, 
-            height: cropData.current.height, 
+            x: Math.abs(cropData.current.x),
+            y: Math.abs(cropData.current.y),
+            width: cropData.current.width,
+            height: cropData.current.height,
             unit:'px' 
+        });
+    }
+
+    useEffect(() => {
+        makeClientCrop();
+    }, [crop]);
+
+    // TODO: TEST
+    const makeClientCrop = async () => {
+        if (imgRef.current && crop.width && crop.height) {
+            const cropped = await getCroppedImg(
+                imgRef.current,
+                crop,
+                'newFile.jpeg'
+            );
+            setCroppedImageUrl(cropped);
+        }
+    }
+
+    const getCroppedImg = (image, crop, fileName) => {
+        const canvas = document.createElement('canvas');
+        const pixelRatio = window.devicePixelRatio;
+        const scaleX = image.naturalWidth / image.width;
+        const scaleY = image.naturalHeight / image.height;
+        const ctx = canvas.getContext('2d');
+
+        canvas.width = crop.width * pixelRatio * scaleX;
+        canvas.height = crop.height * pixelRatio * scaleY;
+
+        ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+        ctx.imageSmoothingQuality = 'high';
+
+        ctx.drawImage(
+        image,
+        crop.x * scaleX,
+        crop.y * scaleY,
+        crop.width * scaleX,
+        crop.height * scaleY,
+        0,
+        0,
+        crop.width * scaleX,
+        crop.height * scaleY
+        );
+
+        return new Promise((resolve, reject) => {
+            canvas.toBlob((blob) => {
+                if (!blob) {
+                    console.error('Canvas is empty');
+                    return;
+                }
+
+                blob.name = fileName;
+                URL.revokeObjectURL(fileUrl);
+                const fileUrl = URL.createObjectURL(blob);
+                resolve(fileUrl);
+            },
+            'image/jpeg',
+            1
+            );
         });
     }
 
@@ -61,8 +127,6 @@ const ImageZoom = ({ image, setCrop }) => {
                     {img && <img ref={imgRef} src={img.src} style={{ maxWidth: '100%' }} />}
                 </TransformComponent>
             </TransformWrapper>
-
-            {/* {croppedImageUrl && <img src={croppedImageUrl} style={{ maxWidth: '100%' }} /> } */}
         </>
     );
 };
